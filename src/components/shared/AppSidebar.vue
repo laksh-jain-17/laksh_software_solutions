@@ -108,8 +108,14 @@ function isActive(path) {
 }
 
 async function logout() {
-  await authStore.logout()
-  toast.success('Signed out successfully')
-  router.push('/login')
+  try {
+    await authStore.logout()
+    toast.success('Signed out successfully')
+  } catch (e) {
+    // ignore errors
+  } finally {
+    // Force redirect no matter what
+    window.location.href = '/login'
+  }
 }
 </script>
