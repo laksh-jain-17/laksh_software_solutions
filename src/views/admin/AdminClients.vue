@@ -155,6 +155,10 @@ async function saveClient() {
       await supabase.from('profiles').update({ full_name: form.value.full_name, updated_at: new Date().toISOString() }).eq('id', editingClient.value.id)
       toast.success('Client updated')
     } else {
+      // Save current admin session first
+      const { data: { session: adminSession } } = await supabase.auth.getSession()
+
+      // Create the new client account
       const { data, error } = await supabase.auth.signUp({
         email: form.value.email,
         password: form.value.password,
@@ -165,6 +169,7 @@ async function saveClient() {
       if (error) throw error
       if (!data.user) throw new Error('User creation failed')
 
+      // Insert profile with correct role
       const { error: profileError } = await supabase.from('profiles').upsert({
         id: data.user.id,
         email: form.value.email,
@@ -173,6 +178,14 @@ async function saveClient() {
         updated_at: new Date().toISOString()
       })
       if (profileError) throw profileError
+
+      // Restore admin session immediately
+      if (adminSession) {
+        await supabase.auth.setSession({
+          access_token: adminSession.access_token,
+          refresh_token: adminSession.refresh_token
+        })
+      }
 
       toast.success('Client account created! They can now log in.')
     }
