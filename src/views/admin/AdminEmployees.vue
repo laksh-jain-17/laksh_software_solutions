@@ -180,23 +180,28 @@ async function saveEmployee() {
       if (error) throw error
       toast.success('Employee updated successfully')
     } else {
-      // Create user via admin API
-      const { data, error } = await supabase.auth.admin.createUser({
+      // Use signUp so no service role key is needed
+      const { data, error } = await supabase.auth.signUp({
         email: form.value.email,
         password: form.value.password,
-        email_confirm: true,
-        user_metadata: { full_name: form.value.full_name, role: 'EMPLOYEE' }
+        options: {
+          data: { full_name: form.value.full_name, role: 'EMPLOYEE' }
+        }
       })
       if (error) throw error
+      if (!data.user) throw new Error('User creation failed')
 
-      // Upsert profile
-      await supabase.from('profiles').upsert({
+      // Force set the correct role in profiles (trigger may set CLIENT by default)
+      const { error: profileError } = await supabase.from('profiles').upsert({
         id: data.user.id,
         email: form.value.email,
         full_name: form.value.full_name,
         role: 'EMPLOYEE',
+        updated_at: new Date().toISOString()
       })
-      toast.success('Employee account created successfully')
+      if (profileError) throw profileError
+
+      toast.success('Employee account created! They can now log in.')
     }
     closeModal()
     await fetchEmployees()
@@ -215,9 +220,13 @@ function confirmDelete(emp) {
 async function deleteEmployee() {
   saving.value = true
   try {
-    const { error } = await supabase.auth.admin.deleteUser(deletingEmployee.value.id)
+    // Delete profile (auth user will cascade if set up, otherwise just remove profile)
+    const { error } = await supabase
+      .from('profiles')
+      .delete()
+      .eq('id', deletingEmployee.value.id)
     if (error) throw error
-    toast.success('Employee removed')
+    toast.success('Employee removed from portal')
     showDeleteModal.value = false
     await fetchEmployees()
   } catch (err) {
