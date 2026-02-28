@@ -180,7 +180,10 @@ async function saveEmployee() {
       if (error) throw error
       toast.success('Employee updated successfully')
     } else {
-      // Use signUp so no service role key is needed
+      // Save current admin session first
+      const { data: { session: adminSession } } = await supabase.auth.getSession()
+
+      // Create the new employee account
       const { data, error } = await supabase.auth.signUp({
         email: form.value.email,
         password: form.value.password,
@@ -191,7 +194,7 @@ async function saveEmployee() {
       if (error) throw error
       if (!data.user) throw new Error('User creation failed')
 
-      // Force set the correct role in profiles (trigger may set CLIENT by default)
+      // Insert profile directly with correct role
       const { error: profileError } = await supabase.from('profiles').upsert({
         id: data.user.id,
         email: form.value.email,
@@ -200,6 +203,14 @@ async function saveEmployee() {
         updated_at: new Date().toISOString()
       })
       if (profileError) throw profileError
+
+      // Restore admin session immediately
+      if (adminSession) {
+        await supabase.auth.setSession({
+          access_token: adminSession.access_token,
+          refresh_token: adminSession.refresh_token
+        })
+      }
 
       toast.success('Employee account created! They can now log in.')
     }
