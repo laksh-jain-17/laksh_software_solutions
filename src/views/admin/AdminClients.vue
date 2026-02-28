@@ -155,15 +155,26 @@ async function saveClient() {
       await supabase.from('profiles').update({ full_name: form.value.full_name, updated_at: new Date().toISOString() }).eq('id', editingClient.value.id)
       toast.success('Client updated')
     } else {
-      const { data, error } = await supabase.auth.admin.createUser({
+      const { data, error } = await supabase.auth.signUp({
         email: form.value.email,
         password: form.value.password,
-        email_confirm: true,
-        user_metadata: { full_name: form.value.full_name, role: 'CLIENT' }
+        options: {
+          data: { full_name: form.value.full_name, role: 'CLIENT' }
+        }
       })
       if (error) throw error
-      await supabase.from('profiles').upsert({ id: data.user.id, email: form.value.email, full_name: form.value.full_name, role: 'CLIENT' })
-      toast.success('Client account created')
+      if (!data.user) throw new Error('User creation failed')
+
+      const { error: profileError } = await supabase.from('profiles').upsert({
+        id: data.user.id,
+        email: form.value.email,
+        full_name: form.value.full_name,
+        role: 'CLIENT',
+        updated_at: new Date().toISOString()
+      })
+      if (profileError) throw profileError
+
+      toast.success('Client account created! They can now log in.')
     }
     closeModal()
     await fetchClients()
@@ -179,8 +190,12 @@ function confirmDelete(client) { deletingClient.value = client; showDeleteModal.
 async function deleteClient() {
   saving.value = true
   try {
-    await supabase.auth.admin.deleteUser(deletingClient.value.id)
-    toast.success('Client removed')
+    const { error } = await supabase
+      .from('profiles')
+      .delete()
+      .eq('id', deletingClient.value.id)
+    if (error) throw error
+    toast.success('Client removed from portal')
     showDeleteModal.value = false
     await fetchClients()
   } catch (err) {
