@@ -13,7 +13,7 @@ A full-featured **role-based company management portal** built with Vue 3 + Supa
 | Role | Email | Password |
 |------|-------|----------|
 | **Admin** | admin@laksh.dev | Admin@123 |
-| **Employee** | emp@laksh.dev | Emp@1234 |
+| **Employee** | emp1@laksh.dev | empl1234 |
 | **Client** | client@laksh.dev | Client@123 |
 
 ---
